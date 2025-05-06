@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to SESAcademy | Student Onboarding</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-container container">
+            <div class="logo">SES<span>Academy</span></div>
+            
+            <div class="user-menu">
+                <div class="user-avatar" id="user-avatar"></div>
+            </div>
+        </div>
+    </header>
+    
+    <div class="onboarding-container">
+        <div class="onboarding-header">
+            <h1>Welcome to SESAcademy!</h1>
+            <p>Let's get you set up for success</p>
+        </div>
+        
+        <div class="onboarding-steps">
+            <div class="step active">
+                <div class="step-number">1</div>
+                <div class="step-text">Select Interests</div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-text">Course Recommendations</div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-text">Complete Setup</div>
+            </div>
+        </div>
+        
+        <!-- Step 1: Interests -->
+        <div class="onboarding-content" id="step-1">
+            <div class="welcome-message">
+                <h2>What are you interested in learning?</h2>
+                <p>Select the topics that interest you so we can recommend relevant courses.</p>
+            </div>
+            
+            <div class="interests-grid">
+                <div class="interest-card" data-interest="programming">
+                    <h3>Programming</h3>
+                    <p>Learn to code and build software applications</p>
+                </div>
+                <div class="interest-card" data-interest="data-science">
+                    <h3>Data Science</h3>
+                    <p>Analyze data and build predictive models</p>
+                </div>
+                <div class="interest-card" data-interest="mathematics">
+                    <h3>Mathematics</h3>
+                    <p>Explore mathematical concepts and theories</p>
+                </div>
+                <div class="interest-card" data-interest="biology">
+                    <h3>Biology</h3>
+                    <p>Study living organisms and life sciences</p>
+                </div>
+                <div class="interest-card" data-interest="business">
+                    <h3>Business</h3>
+                    <p>Learn business management and entrepreneurship</p>
+                </div>
+                <div class="interest-card" data-interest="psychology">
+                    <h3>Psychology</h3>
+                    <p>Understand human behavior and mental processes</p>
+                </div>
+            </div>
+            
+            <div class="onboarding-actions">
+                <button class="btn btn-outline" id="skip-btn">Skip</button>
+                <button class="btn btn-primary" id="next-btn">Next</button>
+            </div>
+        </div>
+        
+        <!-- Step 2: Recommendations -->
+        <div class="onboarding-content" id="step-2" style="display: none;">
+            <div class="welcome-message">
+                <h2>Recommended Courses</h2>
+                <p>Based on your interests, we recommend these courses to get started.</p>
+            </div>
+            
+            <div class="recommendation-header">
+                <h3>Top Picks for You</h3>
+                <p>Enroll in these courses to begin your learning journey</p>
+            </div>
+            
+            <div class="courses-grid" id="recommended-courses">
+                <!-- Courses will be loaded here -->
+                <div class="loading">Loading recommendations...</div>
+            </div>
+            
+            <div class="onboarding-actions">
+                <button class="btn btn-outline" id="back-btn">Back</button>
+                <button class="btn btn-primary" id="continue-btn">Continue</button>
+            </div>
+        </div>
+        
+        <!-- Step 3: Complete -->
+        <div class="onboarding-content" id="step-3" style="display: none;">
+            <div class="welcome-message">
+                <h2>You're All Set!</h2>
+                <p>Your account is now ready. Start exploring courses and begin your learning journey.</p>
+            </div>
+            
+            <div class="recommendation-header">
+                <h3>What's Next?</h3>
+                <p>Here are some things you can do to get started:</p>
+            </div>
+            
+            <ul class="next-steps">
+                <li><i class="fas fa-check-circle"></i> Browse the course catalog</li>
+                <li><i class="fas fa-check-circle"></i> Enroll in your first course</li>
+                <li><i class="fas fa-check-circle"></i> Complete your profile</li>
+                <li><i class="fas fa-check-circle"></i> Connect with other students</li>
+            </ul>
+            
+            <div class="onboarding-actions">
+                <button class="btn btn-primary btn-block" id="finish-btn">Go to Dashboard</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="../js/auth.js"></script>
+    <script src="../js/data.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check authentication
+            if (!checkAuth('student')) {
+                return;
+            }
+            
+            // Get current user
+            const user = getCurrentUser();
+            
+            // Update UI with student name
+            document.getElementById('user-avatar').textContent = user.firstName.charAt(0) + user.lastName.charAt(0);
+            
+            // Initialize variables
+            let selectedInterests = [];
+            let currentStep = 1;
+            
+            // Interest selection
+            const interestCards = document.querySelectorAll('.interest-card');
+            interestCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const interest = this.getAttribute('data-interest');
+                    
+                    if (this.classList.contains('selected')) {
+                        // Remove from selected
+                        this.classList.remove('selected');
+                        selectedInterests = selectedInterests.filter(i => i !== interest);
+                    } else {
+                        // Add to selected
+                        this.classList.add('selected');
+                        selectedInterests.push(interest);
+                    }
+                });
+            });
+            
+            // Navigation buttons
+            document.getElementById('next-btn').addEventListener('click', function() {
+                if (selectedInterests.length === 0) {
+                    alert('Please select at least one interest');
+                    return;
+                }
+                
+                // Load recommended courses
+                loadRecommendedCourses();
+                
+                // Go to step 2
+                goToStep(2);
+            });
+            
+            document.getElementById('skip-btn').addEventListener('click', function() {
+                // Load all courses as recommendations
+                loadAllCourses();
+                
+                // Go to step 2
+                goToStep(2);
+            });
+            
+            document.getElementById('back-btn').addEventListener('click', function() {
+                goToStep(1);
+            });
+            
+            document.getElementById('continue-btn').addEventListener('click', function() {
+                goToStep(3);
+            });
+            
+            document.getElementById('finish-btn').addEventListener('click', function() {
+                window.location.href = 'dashboard.html';
+            });
+            
+            // Function to go to a specific step
+            function goToStep(step) {
+                // Hide all steps
+                document.getElementById('step-1').style.display = 'none';
+                document.getElementById('step-2').style.display = 'none';
+                document.getElementById('step-3').style.display = 'none';
+                
+                // Show the current step
+                document.getElementById(`step-${step}`).style.display = 'block';
+                
+                // Update step indicators
+                const steps = document.querySelectorAll('.step');
+                steps.forEach((s, index) => {
+                    if (index + 1 < step) {
+                        s.classList.remove('active');
+                        s.classList.add('completed');
+                    } else if (index + 1 === step) {
+                        s.classList.add('active');
+                        s.classList.remove('completed');
+                    } else {
+                        s.classList.remove('active');
+                        s.classList.remove('completed');
+                    }
+                });
+                
+                currentStep = step;
+            }
+            
+            // Load recommended courses based on interests
+            function loadRecommendedCourses() {
+                const recommendedCoursesContainer = document.getElementById('recommended-courses');
+                
+                // Map interests to department IDs
+                const departmentMap = {
+                    'programming': 1, // Computer Science
+                    'data-science': 1, // Computer Science
+                    'mathematics': 2, // Mathematics
+                    'biology': 3, // Biology
+                    'business': 4, // Business
+                    'psychology': 5 // Psychology
+                };
+                
+                // Get departments based on interests
+                const departments = selectedInterests.map(interest => departmentMap[interest]);
+                
+                // Filter courses by departments
+                let recommendedCourses = courses.filter(course => departments.includes(course.departmentId));
+                
+                // Limit to 6 courses
+                recommendedCourses = recommendedCourses.slice(0, 6);
+                
+                if (recommendedCourses.length === 0) {
+                    recommendedCoursesContainer.innerHTML = '<p>No courses found matching your interests. Try selecting different interests.</p>';
+                    return;
+                }
+                
+                let html = '';
+                
+                recommendedCourses.forEach(course => {
+                    const department = getDepartmentById(course.departmentId);
+                    const instructor = getInstructorById(course.instructorId);
+                    
+                    html += `
+                        <div class="course-card">
+                            <div class="course-image">
+                                <img src="${course.image}" alt="${course.title}">
+                                <div class="course-badge">${department.name}</div>
+                            </div>
+                            <div class="course-content">
+                                <h3 class="course-title">${course.title}</h3>
+                                <p class="course-instructor">${instructor.firstName} ${instructor.lastName} • ${course.credits} Credits</p>
+                                <div class="course-meta">
+                                    <div class="course-rating">
+                                        <span class="stars">★★★★★</span>
+                                        <span class="value">4.8</span>
+                                        <span class="count">(2,345)</span>
+                                    </div>
+                                </div>
+                                <div class="course-actions">
+                                    <button class="btn btn-primary btn-block enroll-btn" data-course-id="${course.id}">Enroll Now</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                recommendedCoursesContainer.innerHTML = html;
+                
+                // Add event listeners to enroll buttons
+                recommendedCoursesContainer.querySelectorAll('.enroll-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const courseId = parseInt(this.getAttribute('data-course-id'));
+                        enrollInCourse(courseId);
+                        this.disabled = true;
+                        this.textContent = 'Enrolled';
+                    });
+                });
+            }
+            
+            // Load all courses as recommendations
+            function loadAllCourses() {
+                const recommendedCoursesContainer = document.getElementById('recommended-courses');
+                
+                // Get a random selection of courses
+                let randomCourses = [...courses].sort(() => 0.5 - Math.random()).slice(0, 6);
+                
+                let html = '';
+                
+                randomCourses.forEach(course => {
+                    const department = getDepartmentById(course.departmentId);
+                    const instructor = getInstructorById(course.instructorId);
+                    
+                    html += `
+                        <div class="course-card">
+                            <div class="course-image">
+                                <img src="${course.image}" alt="${course.title}">
+                                <div class="course-badge">${department.name}</div>
+                            </div>
+                            <div class="course-content">
+                                <h3 class="course-title">${course.title}</h3>
+                                <p class="course-instructor">${instructor.firstName} ${instructor.lastName} • ${course.credits} Credits</p>
+                                <div class="course-meta">
+                                    <div class="course-rating">
+                                        <span class="stars">★★★★★</span>
+                                        <span class="value">4.8</span>
+                                        <span class="count">(2,345)</span>
+                                    </div>
+                                </div>
+                                <div class="course-actions">
+                                    <button class="btn btn-primary btn-block enroll-btn" data-course-id="${course.id}">Enroll Now</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                recommendedCoursesContainer.innerHTML = html;
+                
+                // Add event listeners to enroll buttons
+                recommendedCoursesContainer.querySelectorAll('.enroll-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const courseId = parseInt(this.getAttribute('data-course-id'));
+                        enrollInCourse(courseId);
+                        this.disabled = true;
+                        this.textContent = 'Enrolled';
+                    });
+                });
+            }
+            
+            // Enroll in course
+            function enrollInCourse(courseId) {
+                const user = getCurrentUser();
+                
+                // Create new enrollment
+                const newEnrollment = {
+                    id: enrollments.length + 1,
+                    studentId: parseInt(user.id),
+                    courseId: courseId,
+                    enrollmentDate: new Date().toISOString().split('T')[0],
+                    grade: null
+                };
+                
+                // Add to enrollments
+                enrollments.push(newEnrollment);
+                
+                // Update course enrollment count
+                const courseIndex = courses.findIndex(c => c.id === courseId);
+                courses[courseIndex].currentEnrollment++;
+                
+                // Update localStorage
+                localStorage.setItem('enrollments', JSON.stringify(enrollments));
+                localStorage.setItem('courses', JSON.stringify(courses));
+                
+                // Show success message
+                alert(`Successfully enrolled in ${courses[courseIndex].title}`);
+            }
+        });
+    </script>
+</body>
+</html>
