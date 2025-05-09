@@ -49,19 +49,37 @@ $enrolled_course_ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
 // Handle enrollment
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enroll_course_id'])) {
     $course_id = $_POST['enroll_course_id'];
-    $stmt = $conn->prepare("SELECT capacity, (SELECT COUNT(*) FROM enrollments e WHERE e.CourseID = c.id) AS current_enrollment FROM courses c WHERE id = :course_id");
-    $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
-    $stmt->execute();
-    $course = $stmt->fetch(PDO::FETCH_ASSOC);
+    $conn->beginTransaction(); // Start transaction
 
-    if ($course && $course['current_enrollment'] < $course['capacity']) {
-        $stmt = $conn->prepare("INSERT INTO enrollments (StudentID, CourseID, EnrollmentDate) VALUES (:user_id, :course_id, NOW())");
-        $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+    try {
+        // Lock the course row to prevent concurrent modifications
+        $stmt = $conn->prepare("SELECT capacity, (SELECT COUNT(*) FROM enrollments e WHERE e.CourseID = c.id) AS current_enrollment FROM courses c WHERE id = :course_id FOR UPDATE");
         $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
         $stmt->execute();
-        header("Location: catalog.php?enrolled=success");
-        exit();
-    } else {
+        $course = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($course && $course['current_enrollment'] < $course['capacity']) {
+            $stmt = $conn->prepare("INSERT INTO enrollments (StudentID, CourseID, EnrollmentDate) VALUES (:user_id, :course_id, NOW())");
+            $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+            $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
+            $stmt->execute();
+
+            // Optionally update current_enrollment (though this could be handled by a trigger)
+            $stmt = $conn->prepare("UPDATE courses SET current_enrollment = current_enrollment + 1 WHERE id = :course_id");
+            $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $conn->commit(); // Commit transaction
+            header("Location: catalog.php?enrolled=success");
+            exit();
+        } else {
+            $conn->rollBack(); // Roll back if capacity is exceeded
+            header("Location: catalog.php?enrolled=failed");
+            exit();
+        }
+    } catch (PDOException $e) {
+        $conn->rollBack(); // Roll back on error (e.g., deadlock)
+        error_log("Enrollment failed: " . $e->getMessage());
         header("Location: catalog.php?enrolled=failed");
         exit();
     }
