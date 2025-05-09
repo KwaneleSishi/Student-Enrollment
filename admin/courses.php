@@ -9,29 +9,38 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
 }
 
 // Handle course creation
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $title = $_POST['title'];
-    $description = $_POST['description'];
-    $credits = $_POST['credits'];
-    $instructor_id = $_POST['instructor'];
-    $department_id = $_POST['department'];
-    $capacity = $_POST['capacity'];
-    
+$message = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_course'])) {
+    $title = trim($_POST['title']);
+    $description = trim($_POST['description']);
+    $credits = (int)$_POST['credits'];
+    $instructor_id = (int)$_POST['instructor'];
+    $department_id = (int)$_POST['department'];
+    $capacity = (int)$_POST['capacity'];
+
     // Handle image upload
     $image_url = '';
     if (!empty($_FILES['image']['name'])) {
         $target_dir = "assets/uploads/";
         $target_file = $target_dir . basename($_FILES["image"]["name"]);
-        move_uploaded_file($_FILES["image"]["tmp_name"], $target_file);
-        $image_url = $target_file;
+        if (move_uploaded_file($_FILES["image"]["tmp_name"], $target_file)) {
+            $image_url = $target_file;
+        } else {
+            $message = '<div class="alert-danger">Failed to upload image!</div>';
+        }
     } elseif (!empty($_POST['image_url'])) {
-        $image_url = $_POST['image_url'];
+        $image_url = trim($_POST['image_url']);
     }
 
-    $stmt = $conn->prepare("INSERT INTO courses 
-        (title, description, credits, image_url, instructor_id, department_id, capacity)
-        VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$title, $description, $credits, $image_url, $instructor_id, $department_id, $capacity]);
+    if (empty($message) && !empty($title) && !empty($description) && $credits > 0 && $instructor_id > 0 && $department_id > 0 && $capacity > 0) {
+        $stmt = $conn->prepare("INSERT INTO courses 
+            (title, description, credits, image_url, instructor_id, department_id, capacity)
+            VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$title, $description, $credits, $image_url, $instructor_id, $department_id, $capacity]);
+        $message = '<div class="alert-success">Course added successfully!</div>';
+    } else {
+        $message = '<div class="alert-danger">Please fill in all required fields!</div>';
+    }
 }
 
 // Get existing courses
@@ -47,119 +56,182 @@ $departments = $conn->query("SELECT * FROM departments")->fetchAll();
 ?>
 
 <!DOCTYPE html>
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+    <title>Manage Courses | SESAcademy</title>
     <link rel="stylesheet" href="../assets/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .course-thumbnail {
+            width: 100px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .modal-backdrop {
+            display: none;
+        }
+
+        .modal-backdrop.show {
+            display: flex;
+        }
+    </style>
 </head>
-<style>
-    .course-thumbnail {
-    width: 60px;
-    height: 40px;
-    object-fit: cover;
-    border-radius: 4px;
-}
 
-.table-container {
-    background-color: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: var(--card-shadow);
-}
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-container container">
+            <div class="logo">SES<span>Academy</span></div>
+            <div class="user-menu">
+                <div class="user-avatar"><?php echo htmlspecialchars(substr($_SESSION['first_name'], 0, 1) . substr($_SESSION['last_name'], 0, 1)); ?></div>
+            </div>
+        </div>
+    </header>
 
-.table th {
-    background-color: var(--accent-color);
-    padding: 1rem;
-}
+    <div class="main-layout">
+        <!-- Admin Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-menu">
+                <h3>Admin Panel</h3>
+                <ul>
+                    <li><a href="dashboard.php"><i class="fas fa-home"></i> Dashboard</a></li>
+                    <li><a href="courses.php" class="active"><i class="fas fa-book"></i> Manage Courses</a></li>
+                    <li><a href="students.php"><i class="fas fa-users"></i> Manage Students</a></li>
+                    <li><a href="register.php"><i class="fas fa-users"></i> Add Instructors</a></li>
+                    <li><a href="tables.php"><i class="fas fa-database"></i> View Tables</a></li>
+                    <li><a href="backup.php"><i class="fas fa-database"></i> Backup Database</a></li>
+                    <li><a href="../index.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                </ul>
+            </div>
+        </div>
 
-.table td {
-    vertical-align: middle;
-    padding: 1rem;
-}
+        <!-- Content -->
+        <div class="content">
+            <div class="dashboard-header">
+                <h1>Manage Courses</h1>
+                <button class="btn btn-primary" onclick="document.getElementById('add-course-modal').classList.add('show')">
+                    <i class="fas fa-plus"></i> Add New Course
+                </button>
+            </div>
 
-.text-muted {
-    color: var(--text-light);
-}
+            <?php echo $message; ?>
 
-.small {
-    font-size: 0.875rem;
-}
+            <!-- Courses Table -->
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Image</th>
+                            <th>Title</th>
+                            <th>Department</th>
+                            <th>Instructor</th>
+                            <th>Credits</th>
+                            <th>Capacity</th>
+                            <th>Enrolled</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($courses as $course): ?>
+                            <tr>
+                                <td>
+                                    <?php if ($course['image_url']): ?>
+                                        <img src="<?php echo htmlspecialchars($course['image_url']); ?>"
+                                            alt="Course image" class="course-thumbnail" onerror="this.onerror=null; this.src='/SES1/assets/uploads/fallback.jpg';">
+                                    <?php else: ?>
+                                        <img src="/SES1/assets/uploads/fallback.jpg" alt="Course image" class="course-thumbnail">
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <div class="course-title"><?php echo htmlspecialchars($course['title']); ?></div>
+                                    <div class="text-light"><?php echo substr(htmlspecialchars($course['description']), 0, 50); ?>...</div>
+                                </td>
+                                <td><?php echo htmlspecialchars($course['department']); ?></td>
+                                <td><?php echo htmlspecialchars($course['instructor']); ?></td>
+                                <td><?php echo $course['credits']; ?></td>
+                                <td><?php echo $course['capacity']; ?></td>
+                                <td><?php echo $course['current_enrollment']; ?></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline">Edit</button>
+                                    <button class="btn btn-sm btn-danger">Delete</button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
 
-.modal-content {
-    background: white;
-    padding: 2rem;
-    border-radius: 8px;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.file-upload {
-    border: 1px dashed var(--border-color);
-    padding: 1rem;
-    border-radius: 4px;
-}
-
-.file-upload input[type="file"] {
-    margin-bottom: 0.5rem;
-}
-</style>
-<div class="content">
-    <div class="dashboard-header">
-        <h1>Manage Courses</h1>
-        <a href="add_course.php" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Add New Course
-        </a>
+            <!-- Add Course Modal -->
+            <div id="add-course-modal" class="modal-backdrop">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3>Add New Course</h3>
+                        <button class="modal-close" onclick="document.getElementById('add-course-modal').classList.remove('show')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form method="POST" enctype="multipart/form-data">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Title</label>
+                                    <input type="text" name="title" class="form-control" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Credits</label>
+                                    <input type="number" name="credits" class="form-control" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Instructor</label>
+                                    <select name="instructor" class="form-control" required>
+                                        <option value="">Select Instructor</option>
+                                        <?php foreach ($instructors as $instructor): ?>
+                                            <option value="<?php echo $instructor['id']; ?>">
+                                                <?php echo htmlspecialchars($instructor['first_name'] . ' ' . $instructor['last_name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Department</label>
+                                    <select name="department" class="form-control" required>
+                                        <option value="">Select Department</option>
+                                        <?php foreach ($departments as $dept): ?>
+                                            <option value="<?php echo $dept['id']; ?>">
+                                                <?php echo htmlspecialchars($dept['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Capacity</label>
+                                    <input type="number" name="capacity" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <textarea name="description" class="form-control" required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Course Image</label>
+                                <div class="form-control" style="padding: 1rem; border: 1px dashed var(--border-color);">
+                                    <input type="file" name="image" accept="image/*">
+                                    <p class="form-text">Or enter image URL:</p>
+                                    <input type="url" name="image_url" class="form-control">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="submit" name="add_course" class="btn btn-primary">Add Course</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+</body>
 
-    <!-- Courses Table -->
-    <div class="table-container">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Image</th>
-                    <th>Title</th>
-                    <th>Department</th>
-                    <th>Instructor</th>
-                    <th>Credits</th>
-                    <th>Capacity</th>
-                    <th>Enrolled</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($courses as $course): ?>
-                <tr>
-                    <td>
-                        <?php if ($course['image_url']): ?>
-                        <img src="<?= htmlspecialchars($course['image_url']) ?>" 
-                            alt="Course image" class="course-thumbnail">
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <div class="course-title"><?= htmlspecialchars($course['title']) ?></div>
-                        <div class="text-muted small"><?= substr(htmlspecialchars($course['description']), 0, 50) ?>...</div>
-                    </td>
-                    <td><?= htmlspecialchars($course['department']) ?></td>
-                    <td><?= htmlspecialchars($course['instructor']) ?></td>
-                    <td><?= $course['credits'] ?></td>
-                    <td><?= $course['capacity'] ?></td>
-                    <td><?= $course['current_enrollment'] ?></td>
-                    <td>
-                        <button class="btn btn-sm btn-outline">Edit</button>
-                        <button class="btn btn-sm btn-danger">Delete</button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-
-    
-</div>
+</html>
