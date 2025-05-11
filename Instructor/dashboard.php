@@ -71,7 +71,7 @@ $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <li><a href="dashboard.php" class="active"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
                     <li><a href="manage_content.php"><i class="fas fa-book"></i> <span>Manage Courses</span></a></li>
                     <li><a href="profile.php"><i class="fas fa-user"></i> <span>Profile</span></a></li>
-                    <li><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
+                    <li><a href="/SES1/index.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
                 </ul>
             </div>
         </div>

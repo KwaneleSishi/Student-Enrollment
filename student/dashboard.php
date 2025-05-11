@@ -85,7 +85,7 @@ $gpa = 'N/A';
             <h3>Account</h3>
             <ul>
                 <li><a href="profile.php"><i class="fas fa-user-cog"></i> <span>Profile</span></a></li>
-                <li><a href="../index.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
+                <li><a href="/SES1/index.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
             </ul>
         </div>
         <div class="content">

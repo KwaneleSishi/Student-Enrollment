@@ -43,6 +43,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_course'])) {
     }
 }
 
+// Handle course update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_course'])) {
+    $id = (int)$_POST['id'];
+    $title = trim($_POST['title']);
+    $description = trim($_POST['description']);
+    $credits = (int)$_POST['credits'];
+    $instructor_id = (int)$_POST['instructor'];
+    $department_id = (int)$_POST['department'];
+    $capacity = (int)$_POST['capacity'];
+
+    if (!empty($title) && !empty($description) && $credits > 0 && $instructor_id > 0 && $department_id > 0 && $capacity > 0) {
+        $stmt = $conn->prepare("UPDATE courses SET title = ?, description = ?, credits = ?, instructor_id = ?, department_id = ?, capacity = ? WHERE id = ?");
+        $stmt->execute([$title, $description, $credits, $instructor_id, $department_id, $capacity, $id]);
+        $message = '<div class="alert-success">Course updated successfully!</div>';
+    } else {
+        $message = '<div class="alert-danger">Please fill in all required fields!</div>';
+    }
+}
+
 // Get existing courses
 $courses = $conn->query("SELECT c.*, d.name AS department, 
     CONCAT(u.first_name, ' ', u.last_name) AS instructor 
@@ -78,6 +97,11 @@ $departments = $conn->query("SELECT * FROM departments")->fetchAll();
 
         .modal-backdrop.show {
             display: flex;
+        }
+
+        .disabled-field {
+            background-color: #f7f9fa;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -157,7 +181,7 @@ $departments = $conn->query("SELECT * FROM departments")->fetchAll();
                                 <td><?php echo $course['capacity']; ?></td>
                                 <td><?php echo $course['current_enrollment']; ?></td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline">Edit</button>
+                                    <button class="btn btn-sm btn-outline" onclick="document.getElementById('edit-course-modal-<?php echo $course['id']; ?>').classList.add('show')">Edit</button>
                                     <button class="btn btn-sm btn-danger">Delete</button>
                                 </td>
                             </tr>
@@ -171,7 +195,7 @@ $departments = $conn->query("SELECT * FROM departments")->fetchAll();
                 <div class="modal">
                     <div class="modal-header">
                         <h3>Add New Course</h3>
-                        <button class="modal-close" onclick="document.getElementById('add-course-modal').classList.remove('show')">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('add-course-modal').classList.remove('show')">×</button>
                     </div>
                     <div class="modal-body">
                         <form method="POST" enctype="multipart/form-data">
@@ -230,8 +254,81 @@ $departments = $conn->query("SELECT * FROM departments")->fetchAll();
                     </div>
                 </div>
             </div>
+
+            <!-- Edit Course Modal -->
+            <?php foreach ($courses as $course): ?>
+                <div id="edit-course-modal-<?php echo $course['id']; ?>" class="modal-backdrop">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h3>Edit Course</h3>
+                            <button class="modal-close" onclick="document.getElementById('edit-course-modal-<?php echo $course['id']; ?>').classList.remove('show')">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <form method="POST" enctype="multipart/form-data">
+                                <input type="hidden" name="id" value="<?php echo $course['id']; ?>">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>Title</label>
+                                        <input type="text" name="title" class="form-control" value="<?php echo htmlspecialchars($course['title']); ?>" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Credits</label>
+                                        <input type="number" name="credits" class="form-control" value="<?php echo $course['credits']; ?>" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Instructor</label>
+                                        <select name="instructor" class="form-control" required>
+                                            <option value="">Select Instructor</option>
+                                            <?php foreach ($instructors as $instructor): ?>
+                                                <option value="<?php echo $instructor['id']; ?>" <?php echo $instructor['id'] == $course['instructor_id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($instructor['first_name'] . ' ' . $instructor['last_name']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Department</label>
+                                        <select name="department" class="form-control" required>
+                                            <option value="">Select Department</option>
+                                            <?php foreach ($departments as $dept): ?>
+                                                <option value="<?php echo $dept['id']; ?>" <?php echo $dept['id'] == $course['department_id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($dept['name']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Capacity</label>
+                                        <input type="number" name="capacity" class="form-control" value="<?php echo $course['capacity']; ?>" required>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Description</label>
+                                    <textarea name="description" class="form-control" required><?php echo htmlspecialchars($course['description']); ?></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Course Image</label>
+                                    <div class="form-control disabled-field" style="padding: 1rem; border: 1px dashed var(--border-color);">
+                                        <p class="form-text">Image remains unchanged: <?php echo htmlspecialchars($course['image_url'] ?: 'No image'); ?></p>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="submit" name="edit_course" class="btn btn-primary">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
     </div>
+    <script>
+        window.onclick = function(event) {
+            if (event.target.className === 'modal-backdrop') {
+                event.target.classList.remove('show');
+            }
+        }
+    </script>
 </body>
 
 </html>
