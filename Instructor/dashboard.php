@@ -53,6 +53,7 @@ $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <div class="nav-links">
                 <a href="dashboard.php" class="active">My Courses</a>
+                <a href="students.php"><span>My Students</a>
                 <a href="profile.php">Profile</a>
             </div>
             <div class="user-menu">
@@ -63,15 +64,18 @@ $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <!-- Main Layout -->
     <div class="main-layout">
-        <!-- Sidebar -->
         <div class="sidebar">
             <div class="sidebar-menu">
-                <h3>Navigation</h3>
+                <h3>Menu</h3>
                 <ul>
-                    <li><a href="dashboard.php" class="active"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
-                    <li><a href="manage_content.php"><i class="fas fa-book"></i> <span>Manage Courses</span></a></li>
-                    <li><a href="profile.php"><i class="fas fa-user"></i> <span>Profile</span></a></li>
-                    <li><a href="/SES1/index.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
+                    <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+                    <li><a href="manage_content.php"><i class="fas fa-book"></i> <span>My Courses</span></a></li>
+                    <li><a href="students.php"><i class="fas fa-users"></i> <span>My Students</span></a></li>
+                </ul>
+                <h3>Account</h3>
+                <ul>
+                    <li><a href="profile.php" class="active"><i class="fas fa-user"></i> <span>Profile</span></a></li>
+                    <li><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
                 </ul>
             </div>
         </div>
