@@ -1,85 +1,81 @@
 <?php
-// admin/backup.php
 session_start();
-require_once '../config/db.php';
+header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-    header("Location: ../login.php");
-    exit();
+// Authentication and authorization check
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
 }
 
 // Configure backup settings
-$backup_dir = __DIR__ . '/../backups/'; // Outside web root
-$max_backups = 5;
-$date = date('Y-m-d_H-i-s');
-$backup_file = $backup_dir . "ses_db_backup_$date.sql";
+$backup_dir = realpath(__DIR__ . '/../backups/'); // Ensure absolute path outside web root
+if (!file_exists($backup_dir) || !is_writable($backup_dir)) {
+    if (!mkdir($backup_dir, 0755, true)) {
+        echo json_encode(['success' => false, 'message' => 'Cannot create backup directory']);
+        exit;
+    }
+}
+
+$filename = 'ses_backup_' . date('Y-m-d_H-i-s') . '_' . uniqid() . '.sql';
+$file_path = $backup_dir . '/' . $filename;
+
+// Database configuration
+$db_host = 'localhost';
+$db_user = 'root';
+$db_pass = 'Kwanele@050509';
+$db_name = 'ses_db';
 
 try {
-    // Create backup directory if not exists
-    if (!file_exists($backup_dir)) {
-        mkdir($backup_dir, 0755, true);
+    $pdo = new PDO("mysql:host=$db_host;dbname=$db_name", $db_user, $db_pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // Start transaction to ensure consistent state
+    $pdo->beginTransaction();
+
+    // Lock tables for reading to prevent changes during backup (optional, depending on needs)
+    $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+    $lock_stmt = $pdo->prepare("LOCK TABLES " . implode(" READ, ", $tables) . " READ");
+    $lock_stmt->execute();
+
+    // Open file for writing
+    $handle = fopen($file_path, 'w');
+    if ($handle === false) {
+        throw new Exception('Cannot create backup file');
     }
 
-    // Verify directory permissions
-    if (!is_writable($backup_dir)) {
-        throw new Exception("Backup directory is not writable");
+    // Export database structure
+    foreach ($tables as $table) {
+        fwrite($handle, "DROP TABLE IF EXISTS `$table`;\n");
+        $create = $pdo->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_ASSOC);
+        fwrite($handle, $create['Create Table'] . ";\n\n");
     }
 
-    // Build mysqldump command
-    $command = sprintf(
-        'mysqldump --user=%s --password=%s --host=%s %s > %s',
-        escapeshellarg($user),
-        escapeshellarg($pass),
-        escapeshellarg($host),
-        escapeshellarg($dbname),
-        escapeshellarg($backup_file)
-    );
-
-    // Execute command
-    exec($command, $output, $return_var);
-
-    if ($return_var !== 0) {
-        throw new Exception("Backup failed with error code: $return_var");
+    // Export data with streaming for large tables
+    foreach ($tables as $table) {
+        $stmt = $pdo->query("SELECT * FROM `$table`");
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $values = implode(', ', array_map(function($value) use ($pdo) {
+                return $pdo->quote($value);
+            }, $row));
+            fwrite($handle, "INSERT INTO `$table` VALUES ($values);\n");
+        }
+        fwrite($handle, "\n");
     }
 
-    // Cleanup old backups
-    $files = glob($backup_dir . "ses_db_backup_*.sql");
-    if (count($files) > $max_backups) {
-        array_multisort(
-            array_map('filemtime', $files),
-            SORT_NUMERIC,
-            SORT_ASC,
-            $files
-        );
-        unlink($files[0]);
-    }
-
-    // Download the backup
-    header('Content-Type: application/octet-stream');
-    header('Content-Disposition: attachment; filename="' . basename($backup_file) . '"');
-    readfile($backup_file);
-    exit;
-
+    // Unlock tables and commit transaction
+    $pdo->query("UNLOCK TABLES");
+    $pdo->commit();
+    fclose($handle);
+ 
+    // Serve file via a secure download script
+    $download_url = '/download.php?file=' . urlencode($filename);
+    echo json_encode(['success' => true, 'message' => 'Backup created', 'download_url' => $download_url]);
 } catch (Exception $e) {
-    die("Backup error: " . $e->getMessage());
-}
-
-// Alternative backup using PHP
-$tables = $conn->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
-
-$sql = "";
-foreach ($tables as $table) {
-    $sql .= "DROP TABLE IF EXISTS `$table`;\n";
-    $create = $conn->query("SHOW CREATE TABLE `$table`")->fetch();
-    $sql .= $create['Create Table'] . ";\n\n";
-    
-    $data = $conn->query("SELECT * FROM `$table`");
-    while ($row = $data->fetch(PDO::FETCH_ASSOC)) {
-        $sql .= "INSERT INTO `$table` VALUES(";
-        $sql .= implode(", ", array_map(fn($v) => $conn->quote($v), $row));
-        $sql .= ");\n";
+    $pdo->rollBack(); // Roll back transaction on failure
+    if (isset($handle) && is_resource($handle)) {
+        fclose($handle); // Ensure file handle is closed on error
     }
-    $sql .= "\n";
+    echo json_encode(['success' => false, 'message' => 'Backup failed: ' . $e->getMessage()]);
 }
-
-file_put_contents($backup_file, $sql);
+?>
