@@ -168,7 +168,7 @@ if (isset($_GET['enrolled'])) {
                 <h3>Account</h3>
                 <ul>
                     <li><a href="profile.php"><i class="fas fa-user"></i> <span>Profile</span></a></li>
-                    <li><a href="/SES1/index.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
+                    <li><a href="#" onclick="if (confirm('Are you sure you want to log out (<?php echo htmlspecialchars($_SESSION['role'] ?? 'Unknown'); ?>)?')) { window.location.href='/SES1/logout.php?confirm=yes'; } else { return false; }"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
                 </ul>
             </div>
         </div>

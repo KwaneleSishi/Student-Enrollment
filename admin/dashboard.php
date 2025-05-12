@@ -47,7 +47,7 @@ $counts = [
                     <li><a href="register.php"><i class="fas fa-users"></i> Add Instructors</a></li>
                     <li><a href="tables.php"><i class="fas fa-database"></i> View Tables</a></li>
                     <li><a href="backup.php"><i class="fas fa-database"></i> Backup Database</a></li>
-                    <li><a href="/SES1/index.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    <li><a href="#" onclick="if (confirm('Are you sure you want to log out (<?php echo htmlspecialchars($_SESSION['role'] ?? 'Unknown'); ?>)?')) { window.location.href='/SES1/logout.php?confirm=yes'; } else { return false; }"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
                 </ul>
             </div>
         </div>
