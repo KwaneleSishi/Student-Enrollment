@@ -139,7 +139,7 @@ if (isset($_GET['enrolled'])) {
             <div class="nav-links">
                 <a href="dashboard.php">My Learning</a>
                 <a href="catalog.php" class="active">Course Catalog</a>
-                <a href="grades.php">My Grades</a>
+                <a href="academic_progress.php">My Grades</a>
             </div>
             <div class="user-menu">
                 <div class="user-avatar"><?php echo htmlspecialchars($user['first_name'][0] . $user['last_name'][0]); ?></div>
@@ -156,7 +156,7 @@ if (isset($_GET['enrolled'])) {
                 <ul>
                     <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
                     <li><a href="catalog.php" class="active"><i class="fas fa-book"></i> <span>Course Catalog</span></a></li>
-                    <li><a href="grades.php"><i class="fas fa-chart-bar"></i> <span>My Grades</span></a></li>
+                    <li><a href="academic_progress.php"><i class="fas fa-chart-bar"></i> <span>My Grades</span></a></li>
                 </ul>
                 <h3>Departments</h3>
                 <ul id="department-menu">

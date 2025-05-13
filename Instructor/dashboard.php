@@ -114,6 +114,7 @@ $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <p class="course-instructor"><?php echo $course['credits']; ?> Credits • <?php echo $course['current_enrollment']; ?> Students</p>
                                 <div class="course-actions">
                                     <a href="manage_content.php?course_id=<?php echo $course['id']; ?>" class="btn btn-primary btn-block">Manage Course</a>
+                                    <a href="set_quiz.php?course_id=<?php echo $course['id']; ?>" class="btn btn-secondary btn-block">Set Quiz</a>
                                 </div>
                             </div>
                         </div>

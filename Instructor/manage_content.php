@@ -203,6 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_lessons'])) {
             <?php endif; ?>
         </div>
     </div>
+    <a href="dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
 </body>
 
 </html>
