@@ -43,21 +43,51 @@ $lesson_grade = count($completed_lessons) * 3;
 // Handle marking as complete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_complete'])) {
     $lesson_number = (int)$_POST['lesson_number'];
-    if (!in_array($lesson_number, $completed_lessons)) {
-        $completed_lessons[] = $lesson_number;
-        $completed_lessons = array_unique($completed_lessons);
-        $lesson_grade = count($completed_lessons) * 3; // Recalculate lesson grade
+    $conn->beginTransaction();
 
-        $stmt = $conn->prepare("UPDATE enrollments SET completed_lessons = :completed, total_grade = :grade WHERE StudentID = :user_id AND CourseID = :course_id");
-        $stmt->bindParam(':completed', json_encode($completed_lessons), PDO::PARAM_STR);
-        $stmt->bindParam(':grade', $lesson_grade, PDO::PARAM_INT);
+    try {
+        // Fetch current enrollment with version
+        $stmt = $conn->prepare("SELECT completed_lessons, version FROM enrollments WHERE StudentID = :user_id AND CourseID = :course_id");
         $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
         $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
         $stmt->execute();
-    }
+        $enrollment = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    header("Location: course_content.php?id=$course_id&lesson=$selected_lesson");
-    exit();
+        if (!$enrollment) {
+            throw new Exception('Enrollment not found');
+        }
+
+        $completed_lessons = json_decode($enrollment['completed_lessons'] ?? '[]', true) ?: [];
+        $current_version = $enrollment['version'];
+
+        if (!in_array($lesson_number, $completed_lessons)) {
+            $completed_lessons[] = $lesson_number;
+            $completed_lessons = array_unique($completed_lessons);
+            $lesson_grade = count($completed_lessons) * 3;
+
+            // Update with version check
+            $stmt = $conn->prepare("UPDATE enrollments SET completed_lessons = :completed, total_grade = :grade, version = version + 1 WHERE StudentID = :user_id AND CourseID = :course_id AND version = :current_version");
+            $stmt->bindParam(':completed', json_encode($completed_lessons), PDO::PARAM_STR);
+            $stmt->bindParam(':grade', $lesson_grade, PDO::PARAM_INT);
+            $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+            $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
+            $stmt->bindParam(':current_version', $current_version, PDO::PARAM_INT);
+            $stmt->execute();
+
+            if ($stmt->rowCount() === 0) {
+                throw new Exception('Concurrent update detected, please retry');
+            }
+        }
+
+        $conn->commit();
+        header("Location: course_content.php?id=$course_id&lesson=$selected_lesson");
+        exit();
+    } catch (Exception $e) {
+        $conn->rollBack();
+        // Handle retry or notify user (e.g., via session flash message)
+        header("Location: course_content.php?id=$course_id&lesson=$selected_lesson&error=concurrent");
+        exit();
+    }
 }
 
 // Get selected lesson content

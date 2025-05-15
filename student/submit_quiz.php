@@ -3,7 +3,6 @@ session_start();
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'student') {
-    // Check if this is an internal cURL call with user_id and role
     if (isset($_POST['user_id']) && isset($_POST['role']) && $_POST['role'] === 'student') {
         $student_id = (int)$_POST['user_id'];
     } else {
@@ -14,13 +13,8 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'student') {
     $student_id = $_SESSION['user_id'];
 }
 
-$db_host = 'localhost';
-$db_user = 'root';
-$db_pass = 'Kwanele@050509';
-$db_name = 'ses_db';
-
 try {
-    $pdo = new PDO("mysql:host=$db_host;dbname=$db_name", $db_user, $db_pass);
+    $pdo = new PDO("mysql:host=localhost;dbname=ses_db", 'root', 'Kwanele@050509');
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     $course_id = isset($_POST['course_id']) ? (int)$_POST['course_id'] : 0;
@@ -31,45 +25,68 @@ try {
         exit;
     }
 
-    // Fetch correct answers
-    $stmt = $pdo->prepare("SELECT question_number, correct_choice FROM quiz_questions WHERE course_id = ?");
-    $stmt->execute([$course_id]);
-    $correct_answers = [];
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $correct_answers[$row['question_number']] = (int)$row['correct_choice'];
-    }
+    $max_retries = 3;
+    $retry_count = 0;
 
-    // Calculate score (2 points per correct answer, total 16 points)
-    $score = 0;
-    for ($i = 1; $i <= 8; $i++) {
-        if (isset($answers[$i], $correct_answers[$i]) && $answers[$i] === $correct_answers[$i]) {
-            $score += 2;
+    while ($retry_count < $max_retries) {
+        $pdo->beginTransaction();
+
+        // Fetch enrollment with version
+        $stmt = $pdo->prepare("SELECT EnrollmentID, total_grade, version FROM enrollments WHERE StudentID = ? AND CourseID = ?");
+        $stmt->execute([$student_id, $course_id]);
+        $enrollment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$enrollment) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Not enrolled']);
+            exit;
         }
+
+        $enrollment_id = $enrollment['EnrollmentID'];
+        $current_version = $enrollment['version'];
+
+        // Fetch correct answers
+        $stmt = $pdo->prepare("SELECT question_number, correct_choice FROM quiz_questions WHERE course_id = ?");
+        $stmt->execute([$course_id]);
+        $correct_answers = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $correct_answers[$row['question_number']] = (int)$row['correct_choice'];
+        }
+
+        // Calculate score
+        $score = 0;
+        for ($i = 1; $i <= 8; $i++) {
+            if (isset($answers[$i], $correct_answers[$i]) && $answers[$i] === $correct_answers[$i]) {
+                $score += 2;
+            }
+        }
+
+        // Record attempt
+        $stmt = $pdo->prepare("INSERT INTO quiz_attempts (enrollment_id, attempt_number, score, completed_at) VALUES (?, 1, ?, NOW())");
+        $stmt->execute([$enrollment_id, $score]);
+
+        // Update total grade with version check
+        $total_grade = $enrollment['total_grade'] + $score;
+        $stmt = $pdo->prepare("UPDATE enrollments SET total_grade = ?, version = version + 1 WHERE EnrollmentID = ? AND version = ?");
+        $stmt->execute([$total_grade, $enrollment_id, $current_version]);
+
+        if ($stmt->rowCount() === 0) {
+            $pdo->rollBack();
+            $retry_count++;
+            continue;
+        }
+
+        $pdo->commit();
+        echo json_encode(['success' => true, 'score' => $score, 'total_grade' => $total_grade]);
+        exit();
     }
 
-    // Get enrollment
-    $stmt = $pdo->prepare("SELECT EnrollmentID, total_grade FROM enrollments WHERE StudentID = ? AND CourseID = ?");
-    $stmt->execute([$student_id, $course_id]);
-    $enrollment = $stmt->fetch(PDO::FETCH_ASSOC);
+    echo json_encode(['success' => false, 'message' => 'Failed due to concurrent updates']);
 
-    if (!$enrollment) {
-        echo json_encode(['success' => false, 'message' => 'Not enrolled']);
-        exit;
-    }
-
-    $enrollment_id = $enrollment['EnrollmentID'];
-    $total_grade = $enrollment['total_grade'] + $score; // Add quiz score to lesson grade
-
-    // Record the attempt
-    $stmt = $pdo->prepare("INSERT INTO quiz_attempts (enrollment_id, attempt_number, score, completed_at) VALUES (?, ?, ?, NOW())");
-    $stmt->execute([$enrollment_id, 1, $score]); // Simplified: always attempt 1 for now
-
-    // Update total grade in enrollments
-    $stmt = $pdo->prepare("UPDATE enrollments SET total_grade = ? WHERE EnrollmentID = ?");
-    $stmt->execute([$total_grade, $enrollment_id]);
-
-    echo json_encode(['success' => true, 'score' => $score, 'total_grade' => $total_grade]);
 } catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }
 ?>

@@ -314,22 +314,28 @@ if (isset($_GET['enrolled'])) {
                 if (enrollBtn.disabled) return;
                 const courseId = enrollCourseId.value;
 
-                fetch('catalog.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded'
-                        },
-                        body: `enroll_course_id=${courseId}`
-                    })
-                    .then(response => {
-                        if (!response.ok) throw new Error('Enrollment failed: ' + response.statusText);
-                        return response.text();
-                    })
-                    .then(() => window.location.href = 'catalog.php?enrolled=success')
-                    .catch(error => {
-                        console.error('Enrollment error:', error);
+                fetch('enroll.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ courseId: courseId })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Enrollment failed: ' + response.statusText);
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = 'catalog.php?enrolled=success';
+                    } else {
                         window.location.href = 'catalog.php?enrolled=failed';
-                    });
+                    }
+                })
+                .catch(error => {
+                    console.error('Enrollment error:', error);
+                    window.location.href = 'catalog.php?enrolled=failed';
+                });
             });
 
             // Setup search

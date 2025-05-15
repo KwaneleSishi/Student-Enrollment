@@ -21,15 +21,13 @@ $selected_course_id = isset($_GET['course_id']) ? (int)$_GET['course_id'] : 0;
 $lessons = [];
 
 if ($selected_course_id) {
-    // Fetch existing lessons for the selected course
     $stmt = $conn->prepare("SELECT * FROM course_content WHERE course_id = :course_id ORDER BY lesson_number");
     $stmt->bindParam(':course_id', $selected_course_id, PDO::PARAM_INT);
     $stmt->execute();
     $lessons = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    // Ensure 4 lessons exist in the array
     for ($i = 1; $i <= 4; $i++) {
         if (!isset($lessons[$i - 1]) || $lessons[$i - 1]['lesson_number'] != $i) {
-            $lessons[] = ['lesson_number' => $i, 'title' => '', 'youtube_url' => '', 'notes' => ''];
+            $lessons[] = ['lesson_number' => $i, 'title' => '', 'youtube_url' => '', 'notes' => '', 'version' => 0];
         }
     }
 }
@@ -40,48 +38,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_lessons'])) {
     $youtube_urls = $_POST['youtube_url'];
     $notes = $_POST['notes'];
 
-    // Validate and update each lesson
-    for ($i = 1; $i <= 4; $i++) {
-        $title = trim($titles[$i]);
-        $youtube_url = trim($youtube_urls[$i]);
-        $note = trim($notes[$i]);
+    $conn->beginTransaction();
+    try {
+        for ($i = 1; $i <= 4; $i++) {
+            $title = trim($titles[$i]);
+            $youtube_url = trim($youtube_urls[$i]);
+            $note = trim($notes[$i]);
+            $current_lesson = array_filter($lessons, fn($l) => $l['lesson_number'] == $i);
+            $current_lesson = reset($current_lesson);
+            $current_version = $current_lesson['version'] ?? 0;
 
-        if (empty($title) || empty($note)) {
-            $message = '<div class="alert alert-danger">Title and notes are required for all lessons!</div>';
-            break;
-        }
+            if (empty($title) || empty($note)) {
+                $message = '<div class="alert alert-danger">Title and notes are required for all lessons!</div>';
+                break;
+            }
 
-        // Check if lesson exists
-        $stmt = $conn->prepare("SELECT id FROM course_content WHERE course_id = :course_id AND lesson_number = :lesson_number");
-        $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
-        $stmt->bindParam(':lesson_number', $i, PDO::PARAM_INT);
-        $stmt->execute();
-        $lesson_id = $stmt->fetchColumn();
-
-        if ($lesson_id) {
-            // Update existing lesson
-            $stmt = $conn->prepare("UPDATE course_content SET title = :title, youtube_url = :youtube_url, notes = :notes WHERE id = :id");
-            $stmt->bindParam(':title', $title, PDO::PARAM_STR);
-            $stmt->bindParam(':youtube_url', $youtube_url, PDO::PARAM_STR);
-            $stmt->bindParam(':notes', $note, PDO::PARAM_STR);
-            $stmt->bindParam(':id', $lesson_id, PDO::PARAM_INT);
-            $stmt->execute();
-        } else {
-            // Insert new lesson
-            $stmt = $conn->prepare("INSERT INTO course_content (course_id, lesson_number, title, youtube_url, notes) VALUES (:course_id, :lesson_number, :title, :youtube_url, :notes)");
+            $stmt = $conn->prepare("SELECT id, version FROM course_content WHERE course_id = :course_id AND lesson_number = :lesson_number");
             $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
             $stmt->bindParam(':lesson_number', $i, PDO::PARAM_INT);
-            $stmt->bindParam(':title', $title, PDO::PARAM_STR);
-            $stmt->bindParam(':youtube_url', $youtube_url, PDO::PARAM_STR);
-            $stmt->bindParam(':notes', $note, PDO::PARAM_STR);
             $stmt->execute();
-        }
-    }
+            $lesson = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (empty($message)) {
+            if ($lesson) {
+                $stmt = $conn->prepare("UPDATE course_content SET title = :title, youtube_url = :youtube_url, notes = :notes, version = version + 1 WHERE id = :id AND version = :current_version");
+                $stmt->bindParam(':title', $title, PDO::PARAM_STR);
+                $stmt->bindParam(':youtube_url', $youtube_url, PDO::PARAM_STR);
+                $stmt->bindParam(':notes', $note, PDO::PARAM_STR);
+                $stmt->bindParam(':id', $lesson['id'], PDO::PARAM_INT);
+                $stmt->bindParam(':current_version', $current_version, PDO::PARAM_INT);
+                $stmt->execute();
+
+                if ($stmt->rowCount() === 0) {
+                    $conn->rollBack();
+                    $message = '<div class="alert alert-danger">Conflict detected, please try again.</div>';
+                    break;
+                }
+            } else {
+                $stmt = $conn->prepare("INSERT INTO course_content (course_id, lesson_number, title, youtube_url, notes, version) VALUES (:course_id, :lesson_number, :title, :youtube_url, :notes, 0)");
+                $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
+                $stmt->bindParam(':lesson_number', $i, PDO::PARAM_INT);
+                $stmt->bindParam(':title', $title, PDO::PARAM_STR);
+                $stmt->bindParam(':youtube_url', $youtube_url, PDO::PARAM_STR);
+                $stmt->bindParam(':notes', $note, PDO::PARAM_STR);
+                $stmt->execute();
+            }
+        }
+
+        $conn->commit();
         $message = '<div class="alert alert-success">Lessons updated successfully!</div>';
         header("Location: manage_content.php?course_id=$course_id");
         exit();
+    } catch (Exception $e) {
+        $conn->rollBack();
+        $message = '<div class="alert alert-danger">Error: ' . htmlspecialchars($e->getMessage()) . '</div>';
     }
 }
 ?>

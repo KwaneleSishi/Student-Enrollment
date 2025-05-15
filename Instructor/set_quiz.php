@@ -10,7 +10,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'instructor') {
 $instructor_id = $_SESSION['user_id'];
 $course_id = isset($_GET['course_id']) ? (int)$_GET['course_id'] : 0;
 
-// Verify the instructor owns the course
 $stmt = $conn->prepare("SELECT id FROM courses WHERE id = :course_id AND instructor_id = :instructor_id");
 $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
 $stmt->bindParam(':instructor_id', $instructor_id, PDO::PARAM_INT);
@@ -20,24 +19,20 @@ if (!$stmt->fetch()) {
     exit();
 }
 
-// Fetch existing questions (if any)
 $stmt = $conn->prepare("SELECT * FROM quiz_questions WHERE course_id = :course_id ORDER BY question_number");
 $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
 $stmt->execute();
 $questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $questions = array_column($questions, null, 'question_number');
 
-// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $conn->beginTransaction();
 
-        // Delete existing questions
         $stmt = $conn->prepare("DELETE FROM quiz_questions WHERE course_id = :course_id");
         $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
         $stmt->execute();
 
-        // Insert new questions
         for ($i = 1; $i <= 8; $i++) {
             $question_text = $_POST["question_$i"];
             $choices = [
@@ -47,8 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST["choice_{$i}_4"]
             ];
             $correct_choice = (int)$_POST["correct_$i"];
+            $current_version = $questions[$i]['version'] ?? 0;
 
-            $stmt = $conn->prepare("INSERT INTO quiz_questions (course_id, question_number, question_text, choice_1, choice_2, choice_3, choice_4, correct_choice) VALUES (:course_id, :question_number, :question_text, :choice_1, :choice_2, :choice_3, :choice_4, :correct_choice)");
+            $stmt = $conn->prepare("INSERT INTO quiz_questions (course_id, question_number, question_text, choice_1, choice_2, choice_3, choice_4, correct_choice, version) VALUES (:course_id, :question_number, :question_text, :choice_1, :choice_2, :choice_3, :choice_4, :correct_choice, 0)");
             $stmt->execute([
                 ':course_id' => $course_id,
                 ':question_number' => $i,
