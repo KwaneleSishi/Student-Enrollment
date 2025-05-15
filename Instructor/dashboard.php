@@ -30,6 +30,7 @@ $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -37,11 +38,23 @@ $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="../assets/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .welcome-message h1 { font-size: 2.2rem; margin-bottom: 0.5rem; }
-        .welcome-message p { font-size: 1.1rem; color: var(--text-light); }
-        .course-card .course-actions .btn { padding: 10px 20px; font-size: 0.9rem; }
+        .welcome-message h1 {
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-message p {
+            font-size: 1.1rem;
+            color: var(--text-light);
+        }
+
+        .course-card .course-actions .btn {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
+
 <body>
     <!-- Header -->
     <header class="header">
@@ -124,4 +137,5 @@ $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 </body>
+
 </html>

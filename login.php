@@ -21,20 +21,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['role'] = $user['role'];
             $_SESSION['first_name'] = $user['first_name'];
             $_SESSION['last_name'] = $user['last_name'];
-            
+
             // Verify redirect path
             $redirect = "{$user['role']}/dashboard.php";
             if (!file_exists($redirect)) {
                 die("Dashboard file missing: " . $redirect);
             }
-            
+
             header("Location: $redirect");
             exit();
         } else {
             header("Location: login.php?error=invalid_credentials");
             exit();
         }
-    } catch(PDOException $e) {
+    } catch (PDOException $e) {
         die("Error: " . $e->getMessage());
     }
 }
@@ -43,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -50,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
     <div class="login-page">
         <div class="login-container">
@@ -57,13 +59,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="logo">SES<span>Academy</span></div>
                 <p>Sign in to your account</p>
             </div>
-            
+
             <div class="role-selector">
                 <div class="role-btn <?= $selectedRole === 'student' ? 'active' : '' ?>" data-role="student">Student</div>
                 <div class="role-btn <?= $selectedRole === 'instructor' ? 'active' : '' ?>" data-role="instructor">Instructor</div>
                 <div class="role-btn <?= $selectedRole === 'admin' ? 'active' : '' ?>" data-role="admin">Admin</div>
             </div>
-            
+
             <?php if (isset($_GET['error'])): ?>
                 <div class="alert alert-danger">
                     Invalid email or password
@@ -77,22 +79,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="email">Email</label>
                     <input type="email" id="email" name="email" class="form-control" required>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" class="form-control" required>
                 </div>
-                
+
                 <button type="submit" class="btn btn-primary btn-block">Sign In</button>
             </form>
-            
+
             <div class="login-footer">
                 <p>Don't have an account? <a href="register.php">Register now</a></p>
             </div>
         </div>
     </div>
-    
+
     <script src="assets/js/script.js"></script>
 </body>
-</html>
 
+</html>

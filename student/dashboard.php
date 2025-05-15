@@ -1,5 +1,4 @@
 <?php
-// student/dashboard.php
 session_start();
 require_once '../config/db.php';
 
@@ -16,11 +15,11 @@ $stmt->execute();
 $student = $stmt->fetch(PDO::FETCH_ASSOC);
 $student_name = $student['first_name'] . ' ' . $student['last_name'];
 
-// Fetch enrolled courses with completion stats
+// Fetch enrolled courses with completion stats and grades
 $stmt = $conn->prepare("
     SELECT c.*, d.name AS department_name, 
            CONCAT(u.first_name, ' ', u.last_name) AS instructor_name,
-           e.completed_lessons
+           e.completed_lessons, e.total_grade
     FROM enrollments e
     JOIN courses c ON e.CourseID = c.id
     JOIN departments d ON c.department_id = d.id
@@ -35,18 +34,38 @@ $enrolled_courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $enrolled_count = count($enrolled_courses);
 $completed_count = 0;
 $total_credits = 0;
+$total_grade_points = 0;
+$completed_credits = 0;
+
 foreach ($enrolled_courses as $course) {
     $total_credits += $course['credits'];
-    $completed_lessons = json_decode($course['completed_lessons'] ?? '[]', true) ?: []; // Handle NULL with default empty array
+    $completed_lessons = json_decode($course['completed_lessons'] ?? '[]', true) ?: [];
     $stmt = $conn->prepare("SELECT COUNT(*) FROM course_content WHERE course_id = :course_id");
     $stmt->bindParam(':course_id', $course['id'], PDO::PARAM_INT);
     $stmt->execute();
     $total_lessons = $stmt->fetchColumn();
-    if ($total_lessons > 0 && count($completed_lessons) >= $total_lessons) {
+
+    // Assume max quiz score is 16 (8 questions × 2 points each) for normalization
+    $max_quiz_score = 16;
+    $percentage = ($course['total_grade'] / $max_quiz_score) * 100;
+
+    // Map percentage to GPA (4.0 scale)
+    $grade_point = 0.0;
+    if ($percentage >= 90) $grade_point = 4.0;
+    elseif ($percentage >= 80) $grade_point = 3.0;
+    elseif ($percentage >= 70) $grade_point = 2.0;
+    elseif ($percentage >= 60) $grade_point = 1.0;
+    else $grade_point = 0.0;
+
+    // Check if course is completed
+    if ($total_lessons > 0 && count($completed_lessons) >= $total_lessons && $course['total_grade'] > 0) {
         $completed_count++;
+        $completed_credits += $course['credits'];
+        $total_grade_points += $grade_point * $course['credits']; // Weighted by credits
     }
 }
-$gpa = 'N/A';
+
+$gpa = $completed_credits > 0 ? number_format($total_grade_points / $completed_credits, 2) : 'N/A';
 ?>
 
 <!DOCTYPE html>
@@ -113,7 +132,7 @@ $gpa = 'N/A';
                 </div>
                 <div class="stat-card">
                     <h3>⏳ Credits Earned</h3>
-                    <div class="value"><?php echo $total_credits; ?></div>
+                    <div class="value"><?php echo $completed_credits; ?></div>
                 </div>
             </div>
             <div class="section-header">
