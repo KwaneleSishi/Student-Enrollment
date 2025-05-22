@@ -251,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
             <div class="nav-links">
                 <a href="dashboard.php">My Learning</a>
                 <a href="catalog.php">Course Catalog</a>
-                <a href="grades.php">My Grades</a>
+                <a href="academic_progress.php">My Grades</a>
             </div>
             <div class="user-menu">
                 <div class="user-avatar"><?php echo htmlspecialchars($user['first_name'][0] . $user['last_name'][0]); ?></div>
@@ -265,7 +265,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                 <ul>
                     <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
                     <li><a href="catalog.php"><i class="fas fa-book"></i> <span>Course Catalog</span></a></li>
-                    <li><a href="grades.php"><i class="fas fa-chart-bar"></i> <span>My Grades</span></a></li>
+                    <li><a href="academic_progress.php"><i class="fas fa-chart-bar"></i> <span>My academic progress</span></a></li>
                 </ul>
                 <h3>Account</h3>
                 <ul>
