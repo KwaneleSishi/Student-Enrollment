@@ -62,5 +62,5 @@ SES implements robust concurrency mechanisms to handle simultaneous updates:
 ## Screenshots
 ![login](assets/images/login.png)
 ![dashboard](assets/images/dashboard.png)
-![Lesson](assets/images/lesson.png)
+![Lesson](assets/images/Lesson.png)
 ![ACprogress](assets/images/ACprogress.png)
