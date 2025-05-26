@@ -59,6 +59,8 @@ SES implements robust concurrency mechanisms to handle simultaneous updates:
 - Implement a more granular GPA scale (e.g., A+, A-, etc.).
 - Deploy to a live server for real-world multi-user testing.
 
-## Contributing
-
-Contributions are welcome! Please fork the repository, make changes, and submit a pull request with a description of your updates.
+## Screenshots
+![login](Assets/images/login.png)
+![dashboard](Assets/images/dashboard.png)
+![Lesson](Assets/images/lesson.png)
+![ACprogress](Assets/images/ACprogress.png)
