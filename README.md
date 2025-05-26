@@ -60,7 +60,7 @@ SES implements robust concurrency mechanisms to handle simultaneous updates:
 - Deploy to a live server for real-world multi-user testing.
 
 ## Screenshots
-![login](Assets/images/login.png)
-![dashboard](Assets/images/dashboard.png)
-![Lesson](Assets/images/lesson.png)
-![ACprogress](Assets/images/ACprogress.png)
+![login](assets/images/login.png)
+![dashboard](assets/images/dashboard.png)
+![Lesson](assets/images/lesson.png)
+![ACprogress](assets/images/ACprogress.png)
