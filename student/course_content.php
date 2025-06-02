@@ -1,6 +1,19 @@
 <?php
+ob_start();
+
 session_start();
+$mark_error = '';
+if (isset($_SESSION['mark_error'])) {
+    $mark_error = $_SESSION['mark_error'];
+    unset($_SESSION['mark_error']);
+}
+
 require_once '../config/db.php';
+
+if (!isset($_SESSION['user_id'])) {
+    error_log("SESSION LOST: course_content.php - " . date('Y-m-d H:i:s'));
+}
+
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student') {
     header("Location: ../login.php");
@@ -22,11 +35,22 @@ if (!$course) {
     exit();
 }
 
-// Fetch lessons for the course
-$stmt = $conn->prepare("SELECT * FROM course_content WHERE course_id = :course_id ORDER BY lesson_number");
-$stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
-$stmt->execute();
-$lessons = $stmt->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $conn->beginTransaction();
+    $conn->exec("SET innodb_lock_wait_timeout = 10");
+    $conn->query("SELECT SLEEP(2)")->fetchAll();
+
+    $stmt = $conn->prepare("SELECT * FROM course_content WHERE course_id = :course_id ORDER BY lesson_number LOCK IN SHARE MODE");
+    $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
+    $stmt->execute();
+    $lessons = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $conn->commit();
+} catch (PDOException $e) {
+    $conn->rollBack();
+    die("Error loading course content: " . $e->getMessage());
+}
+
 
 // Check completed lessons
 $stmt = $conn->prepare("SELECT completed_lessons, total_grade FROM enrollments WHERE StudentID = :user_id AND CourseID = :course_id");
@@ -85,14 +109,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_complete'])) {
     } catch (Exception $e) {
         $conn->rollBack();
         // Handle retry or notify user (e.g., via session flash message)
-        header("Location: course_content.php?id=$course_id&lesson=$selected_lesson&error=concurrent");
-        exit();
+        $_SESSION['mark_error'] = "The lesson content was updated while you were viewing it. Please try again.";
+         header("Location: course_content.php?id=$course_id&lesson=$selected_lesson");
+         exit();
+
     }
 }
 
 // Get selected lesson content
-$selected_content = array_filter($lessons, fn($lesson) => $lesson['lesson_number'] == $selected_lesson);
-$selected_content = !empty($selected_content) ? reset($selected_content) : ['title' => 'Lesson Not Available', 'youtube_url' => '', 'notes' => ''];
+
+$filtered = array_filter($lessons, fn($lesson) => isset($lesson['lesson_number']) && $lesson['lesson_number'] == $selected_lesson);
+$selected_content = !empty($filtered) ? reset($filtered) : ['title' => 'Lesson Not Available', 'youtube_url' => '', 'notes' => ''];
+
+
 
 // Check quiz eligibility and fetch questions
 $show_quiz = false;
@@ -109,10 +138,11 @@ if (count($completed_lessons) === 4 && in_array(1, $completed_lessons) && in_arr
 
     if ($retry_quiz || $last_score === false || empty($quiz_questions)) {
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, "http://localhost/SES1/student/take_quiz.php?course_id=$course_id&user_id=$user_id&role=student");
+        curl_setopt($ch, CURLOPT_URL, 'http://localhost/Student-Enrollment-Test/student/take_quiz.php?course_id=' . $course_id . '&user_id=' . $user_id . '&role=student');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         $response = curl_exec($ch);
         curl_close($ch);
+        
         $quiz_data = json_decode($response, true);
         if ($quiz_data['success']) {
             $show_quiz = true;
@@ -131,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
     }
 
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, "http://localhost/SES1/student/submit_quiz.php");
+    curl_setopt($ch, CURLOPT_URL, "http://localhost/Student-Enrollment-Test/submit_quiz.php");
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
         'course_id' => $course_id,
@@ -153,6 +183,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
     }
 }
 ?>
+
+<?php ob_end_flush(); ?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -298,7 +330,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
                 flex-direction: column;
             }
         }
+       
     </style>
+
+    <noscript>
+        <style>
+            .alert-warning {
+                animation: none;
+                opacity: 1;
+            }
+        </style>
+    </noscript>
 </head>
 
 <body>
@@ -314,6 +356,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
         </div>
     </header>
     <div class="main-layout">
+          <?php if (!empty($mark_error)): ?>
+    <div class="alert alert-warning" style="background: #fff3cd; color: #856404; padding: 10px; margin-bottom: 15px; border-radius: 4px;">
+        <?php echo htmlspecialchars($mark_error); ?>
+    </div>
+        <?php endif; ?>
         <div class="content">
             <h1><?php echo htmlspecialchars($course['title']); ?> (<?php echo htmlspecialchars($course['department_name']); ?>)</h1>
             <div class="course-content-container">
@@ -391,6 +438,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
                 </div>
             </div>
         </div>
+
     </div>
 </body>
 

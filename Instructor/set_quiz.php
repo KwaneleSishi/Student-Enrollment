@@ -26,43 +26,57 @@ $questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $questions = array_column($questions, null, 'question_number');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    
     try {
-        $conn->beginTransaction();
+    $conn->beginTransaction();
+    $conn->exec("SET innodb_lock_wait_timeout = 10");
 
-        $stmt = $conn->prepare("DELETE FROM quiz_questions WHERE course_id = :course_id");
-        $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
-        $stmt->execute();
+    // Lock all quiz questions for the course to prevent edit during quiz access
+    $stmt = $conn->prepare("SELECT question_number FROM quiz_questions WHERE course_id = :course_id FOR UPDATE");
+    $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
+    $stmt->execute();
 
-        for ($i = 1; $i <= 8; $i++) {
-            $question_text = $_POST["question_$i"];
-            $choices = [
-                $_POST["choice_{$i}_1"],
-                $_POST["choice_{$i}_2"],
-                $_POST["choice_{$i}_3"],
-                $_POST["choice_{$i}_4"]
-            ];
-            $correct_choice = (int)$_POST["correct_$i"];
-            $current_version = $questions[$i]['version'] ?? 0;
+    // Delete existing questions
+    $stmt = $conn->prepare("DELETE FROM quiz_questions WHERE course_id = :course_id");
+    $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
+    $stmt->execute();
 
-            $stmt = $conn->prepare("INSERT INTO quiz_questions (course_id, question_number, question_text, choice_1, choice_2, choice_3, choice_4, correct_choice, version) VALUES (:course_id, :question_number, :question_text, :choice_1, :choice_2, :choice_3, :choice_4, :correct_choice, 0)");
-            $stmt->execute([
-                ':course_id' => $course_id,
-                ':question_number' => $i,
-                ':question_text' => $question_text,
-                ':choice_1' => $choices[0],
-                ':choice_2' => $choices[1],
-                ':choice_3' => $choices[2],
-                ':choice_4' => $choices[3],
-                ':correct_choice' => $correct_choice
-            ]);
-        }
+    // Re-insert updated quiz
+    for ($i = 1; $i <= 8; $i++) {
+        $question_text = $_POST["question_$i"];
+        $choices = [
+            $_POST["choice_{$i}_1"],
+            $_POST["choice_{$i}_2"],
+            $_POST["choice_{$i}_3"],
+            $_POST["choice_{$i}_4"]
+        ];
+        $correct_choice = (int)$_POST["correct_$i"];
 
-        $conn->commit();
-        $success_message = "Quiz questions updated successfully!";
-    } catch (Exception $e) {
-        $conn->rollBack();
-        $error_message = "Error: " . $e->getMessage();
+        $stmt = $conn->prepare("INSERT INTO quiz_questions (course_id, question_number, question_text, choice_1, choice_2, choice_3, choice_4, correct_choice, version)
+            VALUES (:course_id, :question_number, :question_text, :choice_1, :choice_2, :choice_3, :choice_4, :correct_choice, 0)");
+        $stmt->execute([
+            ':course_id' => $course_id,
+            ':question_number' => $i,
+            ':question_text' => $question_text,
+            ':choice_1' => $choices[0],
+            ':choice_2' => $choices[1],
+            ':choice_3' => $choices[2],
+            ':choice_4' => $choices[3],
+            ':correct_choice' => $correct_choice
+        ]);
     }
+
+    $conn->commit();
+    $success_message = "Quiz questions updated successfully!";
+} catch (Exception $e) {
+    $conn->rollBack();
+    if (str_contains($e->getMessage(), 'Lock wait timeout exceeded')) {
+        $error_message = "Quiz is currently being accessed by students. Please try again shortly.";
+    } else {
+        $error_message = "Error: " . htmlspecialchars($e->getMessage());
+    }
+}
+
 }
 ?>
 

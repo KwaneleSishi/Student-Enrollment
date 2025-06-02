@@ -197,8 +197,8 @@ if (isset($_GET['enrolled'])) {
                     $availability = $course['capacity'] - $course['current_enrollment'];
                     // Adjust image URL for local files
                     $image_url = $course['image_url'];
-                    if (strpos($image_url, 'http') !== 0 && strpos($image_url, '/SES1/') !== 0) {
-                        $image_url = '/SES1/assets/uploads/' . basename($image_url);
+                    if (strpos($image_url, 'http') !== 0 && strpos($image_url, '/Student-Enrollment-Test/') !== 0) {
+                        $image_url = '/Student-Enrollment-Test/assets/uploads/' . basename($image_url);
                     }
                     ?>
                     <div class="course-card">

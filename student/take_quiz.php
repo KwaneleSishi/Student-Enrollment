@@ -16,8 +16,8 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'student') {
 
 $db_host = 'localhost';
 $db_user = 'root';
-$db_pass = 'Kwanele@050509';
-$db_name = 'ses_db';
+$db_pass = '';
+$db_name = 'ses_db_test';
 
 try {
     $pdo = new PDO("mysql:host=$db_host;dbname=$db_name", $db_user, $db_pass);
@@ -46,17 +46,34 @@ try {
         $pdo->prepare("UPDATE enrollments SET total_grade = 12 WHERE StudentID = ? AND CourseID = ?")->execute([$student_id, $course_id]);
     }
 
-    // Fetch quiz questions
-    $stmt = $pdo->prepare("SELECT question_number, question_text, choice_1, choice_2, choice_3, choice_4 FROM quiz_questions WHERE course_id = ? ORDER BY question_number");
+    try {
+    $pdo->beginTransaction();
+    $pdo->exec("SET innodb_lock_wait_timeout = 10");
+
+    // Lock quiz questions for the course
+    $stmt = $pdo->prepare("SELECT question_number, question_text, choice_1, choice_2, choice_3, choice_4 FROM quiz_questions WHERE course_id = ? ORDER BY question_number FOR UPDATE");
     $stmt->execute([$course_id]);
     $questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     if (count($questions) !== 8) {
+        $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => 'Quiz not fully set up by instructor']);
         exit;
     }
 
+    $pdo->commit();
+
     echo json_encode(['success' => true, 'questions' => $questions]);
+} catch (PDOException $e) {
+    $pdo->rollBack();
+
+    if (str_contains($e->getMessage(), 'Lock wait timeout exceeded')) {
+        echo json_encode(['success' => false, 'message' => 'Quiz is being updated by the instructor. Please try again shortly.']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    }
+}
+
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }
