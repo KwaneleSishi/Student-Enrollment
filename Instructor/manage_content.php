@@ -18,6 +18,7 @@ $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Handle form submission for adding/updating lessons
 $message = '';
 $selected_course_id = isset($_GET['course_id']) ? (int)$_GET['course_id'] : 0;
+
 $lessons = [];
 
 if ($selected_course_id) {
@@ -25,10 +26,14 @@ if ($selected_course_id) {
     $stmt->bindParam(':course_id', $selected_course_id, PDO::PARAM_INT);
     $stmt->execute();
     $lessons = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $lesson_map = [];
+    foreach ($lessons as $lesson) {
+    $lesson_map[$lesson['lesson_number']] = $lesson;
+    }
+
     for ($i = 1; $i <= 4; $i++) {
-        if (!isset($lessons[$i - 1]) || $lessons[$i - 1]['lesson_number'] != $i) {
-            $lessons[] = ['lesson_number' => $i, 'title' => '', 'youtube_url' => '', 'notes' => '', 'version' => 0];
-        }
+         $lessons[$i] = $lesson_map[$i] ?? ['lesson_number' => $i, 'title' => '', 'youtube_url' => '', 'notes' => '', 'version' => 0];
     }
 }
 
@@ -37,8 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_lessons'])) {
     $titles = $_POST['title'];
     $youtube_urls = $_POST['youtube_url'];
     $notes = $_POST['notes'];
-
+     
     $conn->beginTransaction();
+    $conn->exec("SET innodb_lock_wait_timeout = 10");
     try {
         for ($i = 1; $i <= 4; $i++) {
             $title = trim($titles[$i]);
@@ -53,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_lessons'])) {
                 break;
             }
 
-            $stmt = $conn->prepare("SELECT id, version FROM course_content WHERE course_id = :course_id AND lesson_number = :lesson_number");
+            $stmt = $conn->prepare("SELECT id, version FROM course_content WHERE course_id = :course_id AND lesson_number = :lesson_number FOR UPDATE");
             $stmt->bindParam(':course_id', $course_id, PDO::PARAM_INT);
             $stmt->bindParam(':lesson_number', $i, PDO::PARAM_INT);
             $stmt->execute();
@@ -90,7 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_lessons'])) {
         exit();
     } catch (Exception $e) {
         $conn->rollBack();
+       if (str_contains($e->getMessage(), 'Lock wait timeout exceeded')) {
+            $message = '<div class="alert alert-danger">Content is currently being viewed by students. Please try again shortly.</div>';
+       } else {
         $message = '<div class="alert alert-danger">Error: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        }
     }
 }
 ?>

@@ -1,14 +1,20 @@
 <?php
 // config/db.php
-$host = 'localhost';
-$dbname = 'ses_db';
+$host = '127.0.0.1';
+$dbname = 'ses_db_test';
 $user = 'root';
-$pass = 'Kwanele@050509';
+$pass = '';
+$charset = 'utf8mb4';
 
 try {
-    $conn = new PDO("mysql:host=$host;dbname=$dbname", $user, $pass);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $conn = new PDO("mysql:host=$host;dbname=$dbname", $user, $pass,[
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true
+    ]);
+    
 } catch(PDOException $e) {
     die("Connection failed: " . $e->getMessage());
 }
+
 ?>
+
