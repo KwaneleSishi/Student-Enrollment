@@ -21,10 +21,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_course'])) {
     // Handle image upload
     $image_url = '';
     if (!empty($_FILES['image']['name'])) {
-        $target_dir = "assets/uploads/";
+        $target_dir = realpath(__DIR__ . '/../assets/uploads/') . '/';
         $target_file = $target_dir . basename($_FILES["image"]["name"]);
         if (move_uploaded_file($_FILES["image"]["tmp_name"], $target_file)) {
-            $image_url = $target_file;
+            $image_url = 'assets/uploads/' . basename($_FILES["image"]["name"]);
         } else {
             $message = '<div class="alert-danger">Failed to upload image!</div>';
         }
@@ -165,10 +165,10 @@ $departments = $conn->query("SELECT * FROM departments")->fetchAll();
                             <tr>
                                 <td>
                                     <?php if ($course['image_url']): ?>
-                                        <img src="<?php echo htmlspecialchars($course['image_url']); ?>"
-                                            alt="Course image" class="course-thumbnail" onerror="this.onerror=null; this.src='/SES1/assets/uploads/fallback.jpg';">
+                                        <img src="<?php echo htmlspecialchars('/Student-Enrollment/' . $course['image_url']); ?>"
+                                            alt="Course image" class="course-thumbnail" onerror="this.onerror=null; this.src='/Student-Enrollment/assets/uploads/fallback.jpg';">
                                     <?php else: ?>
-                                        <img src="/SES1/assets/uploads/fallback.jpg" alt="Course image" class="course-thumbnail">
+                                        <img src="/Student-Enrollment/assets/uploads/fallback.jpg" alt="Course image" class="course-thumbnail">
                                     <?php endif; ?>
                                 </td>
                                 <td>
